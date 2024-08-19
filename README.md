@@ -1,4 +1,4 @@
-# Alfa Hamster
+# Alfa Hamster Bot
 
 **Alfa Hamster** — автоматический скрипт для кликов в игре от Альфа Банка, написанный на JavaScript.
 
