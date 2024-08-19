@@ -59,7 +59,7 @@
 3. Укажите ваш `API Token` и `UserID` в файле `.env`.
 4. Установите необходимые модули:
     ```bash
-    npm install axios dotenv fs http-proxy-agent path socks-proxy-agent
+    npm install
     ```
 5. Запустите скрипт:
     ```bash
@@ -85,7 +85,7 @@
     ```
 5. Установите необходимые модули:
     ```bash
-    npm install axios dotenv fs http-proxy-agent path socks-proxy-agent
+    npm install
     ```
 6. Запустите скрипт:
     ```bash
