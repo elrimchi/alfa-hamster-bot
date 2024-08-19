@@ -1,0 +1,35 @@
+{
+    "name": "alfa-hamster-bot",
+    "version": "2.0.0",
+    "description": "Скрипт-бот для Хомяка Альфа Банка",
+    "main": "alfa-hamster.js",
+    "scripts": {
+        "start": "node alfa-hamster.js",
+        "install-deps": "npm install"
+    },
+    "dependencies": {
+        "dotenv": "^16.0.0",
+        "fs": "^0.0.1-security",
+        "request-promise": "^4.2.6"
+    },
+    "engines": {
+        "node": ">=14.0.0"
+    },
+    "author": "EKRIM",
+    "license": "MIT",
+    "devDependencies": {},
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/elrimchi/alfa-hamster-bot.git"
+    },
+    "keywords": [
+        "alfa",
+        "hamster",
+        "bot",
+        "script"
+    ],
+    "bugs": {
+        "url": "https://github.com/elrimchi/alfa-hamster-bot/issues"
+    },
+    "homepage": "https://github.com/elrimchi/alfa-hamster-bot#readme"
+}
