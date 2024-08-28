@@ -11,7 +11,6 @@ const androidUserAgents = [
   'Mozilla/5.0 (Linux; Android 7.0; Nexus 6P Build/N4F26O) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.198 Mobile Safari/537.36',
 ];
 
-// Цвета для уровней логирования
 const reset = '\x1b[0m';
 const colors = {
   info: '\x1b[38;5;240m', // Серый
@@ -21,7 +20,6 @@ const colors = {
   debug: '\x1b[38;5;73m'   // Тёмно-синий
 };
 
-// Уровни логирования
 const levels = {
   INFO: 'info',
   SUCCESS: 'success',
@@ -32,24 +30,24 @@ const levels = {
 
 const logLevel = process.env.LOG_LEVEL || levels.INFO;
 
-// Выбор случайного User-Agent
 function getRandomAndroidUserAgent() {
   const randomIndex = Math.floor(Math.random() * androidUserAgents.length);
   return androidUserAgents[randomIndex];
 }
 
-// Логирование с временной меткой и уровнем
+
 function logWithTime(sessionIndex, message, level = levels.INFO) {
   const now = new Date();
   const timeString = now.toTimeString().split(' ')[0];
-  const sessionStr = `[Session ${sessionIndex}]`.padEnd(20);
+  const sessionStr = `Session ${sessionIndex}`.padEnd(20);
 
   if (Object.values(levels).indexOf(level) >= Object.values(levels).indexOf(logLevel)) {
     console.log(`${colors[level]}${sessionStr} [${timeString}] ${message}${reset}`);
   }
 }
 
-// Чтение списка прокси из файла
+
+
 function readProxiesFromFile(filePath) {
   try {
     const fileContent = fs.readFileSync(filePath, 'utf8');
@@ -60,7 +58,7 @@ function readProxiesFromFile(filePath) {
   }
 }
 
-// Проверка прокси
+
 async function checkProxy(proxy) {
   try {
     const response = await request({
@@ -72,7 +70,6 @@ async function checkProxy(proxy) {
       json: true 
     });
 
-    // Извлекаем IP из response.body
     const ip = response.body.origin;
     console.log(`Прокси ${proxy} работает. IP: ${ip}`);
     return response.statusCode === 200;
@@ -82,7 +79,7 @@ async function checkProxy(proxy) {
   }
 }
 
-// Проверка наличия всех переменных окружения
+
 async function getSessionConfig(index) {
   const token = process.env[`API_KEY${index}`];
   const userID = process.env[`USER_ID${index}`];
@@ -106,7 +103,6 @@ async function getSessionConfig(index) {
           return null;
         }
 
-        // Проверяем доступность всех прокси
         const validProxies = [];
         for (const proxy of proxies) {
           const proxyWorks = await checkProxy(proxy);
@@ -123,8 +119,6 @@ async function getSessionConfig(index) {
         }
 
         proxies = validProxies;
-
-        // Выбираем случайный прокси из валидных
         selectedProxy = proxies[Math.floor(Math.random() * proxies.length)];
       }
 
@@ -138,7 +132,8 @@ async function getSessionConfig(index) {
         requestIntervalMax,
         clicksMin,
         clicksMax,
-        nightMode
+        nightMode,
+        isWaiting: false
       };
     }
   }
@@ -146,7 +141,7 @@ async function getSessionConfig(index) {
   return null;
 }
 
-// Получение ночного режима из конфигурации сессии
+
 function getNightMode(session) {
   return session.nightMode;
 }
@@ -157,7 +152,7 @@ function isNightTime() {
   return hour >= 23 || hour < 6; // Ночь: с 23:00 до 06:00
 }
 
-// Автоматическое добавление сессий
+
 async function getSessions() {
   const sessions = [];
   let index = 1;
@@ -175,7 +170,7 @@ async function getSessions() {
   return sessions;
 }
 
-// Основная функция
+
 async function main() {
   const sessions = await getSessions();
 
@@ -197,36 +192,29 @@ async function main() {
   
   logWithTime('ALL', `Запущено ${sessions.length} сессий.`, levels.SUCCESS);
 
-  let isWaiting = false;  // Флаг для отслеживания состояния ожидания
 
-  // Функция для получения случайного числа в диапазоне
   function getRandomInt(min, max) {
     min = Math.ceil(min);
     max = Math.floor(max);
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
-  // Основная функция для отправки запроса и обработки данных
+
   async function fetchData(session, sessionIndex, retryCount = 0) {
-    const maxRetries = 3; // Максимальное количество повторных попыток
+    const maxRetries = 3;
     try {
-      const clicks = getRandomInt(session.clicksMin, session.clicksMax);  
-      const url = `https://back.palindrome.media/api/hampter/sync/${session.userID}/${clicks}`; 
+      const clicks = getRandomInt(session.clicksMin, session.clicksMax);
+      const url = `https://back.palindrome.media/api/hampter/sync/${session.userID}/${clicks}`;
       
-      // Используем выбранный прокси
       const proxy = session.proxyEnabled ? session.selectedProxy : null;
-      
       const randomUserAgent = getRandomAndroidUserAgent();
 
-      if (session.token.includes("Api-Key ")) {
-        // Удаляем "Api-Key " из token
-        token = session.token.replace("Api-Key ", "");
-      }
+      const token = session.token.includes("Api-Key ") ? session.token.replace("Api-Key ", "") : session.token;
 
       const response = await request({
         url: url,
         headers: {
-          'Authorization': `Api-Key ${session.token}`,
+          'Authorization': `Api-Key ${token}`,
           'Accept': '*/*',
           'Accept-Encoding': 'gzip, deflate, br',
           'Accept-Language': 'ru;q=0.6',
@@ -250,7 +238,7 @@ async function main() {
       const formattedCoins = data.coins.toLocaleString('en-US');
       logWithTime(sessionIndex, `${data.name}: +${clicks} кликов | Энергии: ${data.energy}/${data.energyAll} | Монет: ${formattedCoins}`, levels.SUCCESS);
     
-      handleData(data, session, sessionIndex); 
+      handleData(data, session, sessionIndex);
     
     } catch (error) {
       if (retryCount < maxRetries) {
@@ -263,7 +251,7 @@ async function main() {
     }
   }
 
-  // Обработка данных
+
   async function handleData(data, session, sessionIndex) {
     const nightMode = getNightMode(session);
     
@@ -272,23 +260,23 @@ async function main() {
       logWithTime(sessionIndex, `Ожидание ${Math.round(waitTime / 1000)} секунд до следующего запроса...`, levels.WARN);
       setTimeout(() => fetchData(session, sessionIndex), waitTime);
     } else {
-      if (!isWaiting) {
+      if (!session.isWaiting) {
         const energyToWait = data.energyAll - data.energy;
-        const randomFactor = getRandomInt(5, 15); // Случайное число от 5 до 15 секунд
+        const randomFactor = getRandomInt(5, 15);
         const waitTime = (energyToWait + randomFactor) * 1000;
 
         let adjustedWaitTime = waitTime;
         if (nightMode && isNightTime()) {
-          adjustedWaitTime = waitTime * 2; // Удваиваем время ожидания, если включен ночной режим и сейчас ночь
+          adjustedWaitTime = waitTime * 2;
           logWithTime(sessionIndex, `Включен ночной режим, время ожидания после пополнения энергии увеличено в 2 раза`, levels.WARN);
         }
 
         logWithTime(sessionIndex, `Недостаточно энергии. Ожидание ${Math.round(adjustedWaitTime / 1000)} секунд...`, levels.WARN);
 
-        isWaiting = true;
+        session.isWaiting = true;
 
         setTimeout(() => {
-          isWaiting = false;
+          session.isWaiting = false;
           fetchData(session, sessionIndex);
         }, adjustedWaitTime);
       }
@@ -296,7 +284,7 @@ async function main() {
   }
 
   // Запуск всех сессий параллельно с ограничением на количество одновременных запросов
-  const maxConcurrentRequests = parseInt(process.env.MAX_CONCURRENT_REQUESTS || '5', 5);
+  const maxConcurrentRequests = parseInt(process.env.MAX_CONCURRENT_REQUESTS || '5', 10);
   let activeRequests = 0;
   const queue = [];
 
