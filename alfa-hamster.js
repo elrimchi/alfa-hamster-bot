@@ -1,6 +1,7 @@
 require('dotenv').config();
 const request = require('request-promise');
 const fs = require('fs');
+const zlib = require('zlib');
 
 // User-Agent для Android
 const androidUserAgents = [
@@ -203,53 +204,83 @@ async function main() {
   async function fetchData(session, sessionIndex, retryCount = 0) {
     const maxRetries = 3;
     try {
-      const clicks = getRandomInt(session.clicksMin, session.clicksMax);
-      const url = `https://back.palindrome.media/api/hampter/sync/${session.userID}/${clicks}`;
-      
-      const proxy = session.proxyEnabled ? session.selectedProxy : null;
-      const randomUserAgent = getRandomAndroidUserAgent();
+        const clicks = getRandomInt(session.clicksMin, session.clicksMax);
+        const url = `https://back.palindrome.media/api/hampter/sync/${session.userID}/${clicks}`;
+        
+        const proxy = session.proxyEnabled ? session.selectedProxy : null;
+        const randomUserAgent = getRandomAndroidUserAgent();
 
-      const token = session.token.includes("Api-Key ") ? session.token.replace("Api-Key ", "") : session.token;
+        const token = session.token.includes("Api-Key ") ? session.token.replace("Api-Key ", "") : session.token;
 
-      const response = await request({
-        url: url,
-        headers: {
-          'Authorization': `Api-Key ${token}`,
-          'Accept': '*/*',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'Accept-Language': 'ru;q=0.6',
-          'Connection': 'keep-alive',
-          'DNT': '1',
-          'Sec-Ch-Ua-Mobile': '?1',
-          'Sec-Ch-Ua-Platform': 'Android',
-          'Origin': 'https://savemoney.alfabank.ru',
-          'Referer': 'https://savemoney.alfabank.ru/',
-          'Sec-Fetch-Dest': 'empty',
-          'Sec-Fetch-Mode': 'cors',
-          'Sec-Fetch-Site': 'cross-site',
-          'User-Agent': randomUserAgent
-        },
-        proxy: proxy,
-        timeout: 15000,
-        json: true
-      });
+        const response = await request({
+            url: url,
+            headers: {
+              'Authorization': `Api-Key ${token}`,
+              'Accept': '*/*',
+              'Accept-Encoding': 'gzip, deflate, br',
+              'Accept-Language': 'ru;q=0.6',
+              'Connection': 'keep-alive',
+              'DNT': '1',
+              'Sec-Ch-Ua-Mobile': '?1',
+              'Sec-Ch-Ua-Platform': 'Android',
+              'Origin': 'https://savemoney.alfabank.ru',
+              'Referer': 'https://savemoney.alfabank.ru/',
+              'Sec-Fetch-Dest': 'empty',
+              'Sec-Fetch-Mode': 'cors',
+              'Sec-Fetch-Site': 'cross-site',
+              'User-Agent': randomUserAgent
+            },
+            proxy: proxy,
+            timeout: 15000,
+            encoding: null, 
+            json: false,
+            resolveWithFullResponse: true
+        });
+
+        // Проверка статуса ответа
+        if (response.statusCode !== 200) {
+            throw new Error(`Unexpected status code: ${response.statusCode}`);
+        }
+
+        // Декомпрессия данных
+        const encoding = response.headers['content-encoding'];
+        let decompressedBody;
+
+        if (encoding === 'gzip') {
+            decompressedBody = zlib.gunzipSync(response.body);
+        } else if (encoding === 'deflate') {
+            decompressedBody = zlib.inflateSync(response.body);
+        } else if (encoding === 'br') {
+            decompressedBody = zlib.brotliDecompressSync(response.body);
+        } else {
+            decompressedBody = response.body;
+        }
+
+        const data = JSON.parse(decompressedBody.toString());
+
+
+       
+        if (!data || typeof data.coins === 'undefined') {
+            throw new Error('Отсутствует свойство "coins" в ответе.');
+        }
+
+        const formattedCoins = data.coins.toLocaleString('en-US');
+        logWithTime(sessionIndex, `${data.name}: +${clicks} кликов | Энергии: ${data.energy}/${data.energyAll} | Монет: ${formattedCoins}`, levels.SUCCESS);
     
-      const data = response;
-      const formattedCoins = data.coins.toLocaleString('en-US');
-      logWithTime(sessionIndex, `${data.name}: +${clicks} кликов | Энергии: ${data.energy}/${data.energyAll} | Монет: ${formattedCoins}`, levels.SUCCESS);
-    
-      handleData(data, session, sessionIndex);
+        handleData(data, session, sessionIndex);
     
     } catch (error) {
-      if (retryCount < maxRetries) {
-        logWithTime(sessionIndex, `Ошибка запроса. Повторная попытка ${retryCount + 1}/${maxRetries}. Ошибка: ${error.message}`, levels.ERROR);
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        return fetchData(session, sessionIndex, retryCount + 1);
-      } else {
-        logWithTime(sessionIndex, `Ошибка: ${error.message}. Все попытки исчерпаны.`, levels.ERROR);
-      }
+        if (retryCount < maxRetries) {
+            logWithTime(sessionIndex, `Ошибка запроса. Повторная попытка ${retryCount + 1}/${maxRetries}. Ошибка: ${error.message}`, levels.ERROR);
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            return fetchData(session, sessionIndex, retryCount + 1);
+        } else {
+            logWithTime(sessionIndex, `Ошибка: ${error.message}. Все попытки исчерпаны.`, levels.ERROR);
+        }
     }
-  }
+}
+
+
 
 
   async function handleData(data, session, sessionIndex) {
