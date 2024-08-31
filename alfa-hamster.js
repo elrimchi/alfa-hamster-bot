@@ -237,12 +237,11 @@ async function main() {
             resolveWithFullResponse: true
         });
 
-        // Проверка статуса ответа
         if (response.statusCode !== 200) {
             throw new Error(`Unexpected status code: ${response.statusCode}`);
         }
 
-        // Декомпрессия данных
+
         const encoding = response.headers['content-encoding'];
         let decompressedBody;
 
@@ -280,37 +279,36 @@ async function main() {
     }
 }
 
-
-
-
   async function handleData(data, session, sessionIndex) {
     const nightMode = getNightMode(session);
-    
-    if (data.energy > 0) {
-      const waitTime = getRandomInt(session.requestIntervalMin, session.requestIntervalMax) * 1000;
-      logWithTime(sessionIndex, `Ожидание ${Math.round(waitTime / 1000)} секунд до следующего запроса...`, levels.WARN);
-      setTimeout(() => fetchData(session, sessionIndex), waitTime);
+    const minEnergy = parseInt(process.env[`MIN_ENERGY${sessionIndex}`] || '120', 10);
+
+    if (data.energy > minEnergy) {
+        const waitTime = getRandomInt(session.requestIntervalMin, session.requestIntervalMax) * 1000;
+        logWithTime(sessionIndex, `Ожидание ${Math.round(waitTime / 1000)} секунд до следующего запроса...`, levels.WARN);
+        setTimeout(() => fetchData(session, sessionIndex), waitTime);
     } else {
-      if (!session.isWaiting) {
+        if (!session.isWaiting) {
+            logWithTime(sessionIndex, `Энергия опустилась ниже установленного минимума. Переход в состояние ожидания.`, levels.WARN);
+            session.isWaiting = true;
+        }
+
         const energyToWait = data.energyAll - data.energy;
         const randomFactor = getRandomInt(5, 15);
         const waitTime = (energyToWait + randomFactor) * 1000;
 
         let adjustedWaitTime = waitTime;
         if (nightMode && isNightTime()) {
-          adjustedWaitTime = waitTime * 2;
-          logWithTime(sessionIndex, `Включен ночной режим, время ожидания после пополнения энергии увеличено в 2 раза`, levels.WARN);
+            adjustedWaitTime = waitTime * 2;
+            logWithTime(sessionIndex, `Включен ночной режим, время ожидания после пополнения энергии увеличено в 2 раза`, levels.WARN);
         }
 
         logWithTime(sessionIndex, `Недостаточно энергии. Ожидание ${Math.round(adjustedWaitTime / 1000)} секунд...`, levels.WARN);
 
-        session.isWaiting = true;
-
         setTimeout(() => {
-          session.isWaiting = false;
-          fetchData(session, sessionIndex);
+            session.isWaiting = false;
+            fetchData(session, sessionIndex);
         }, adjustedWaitTime);
-      }
     }
   }
 
