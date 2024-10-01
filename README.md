@@ -1,4 +1,4 @@
-# Alfa Hamster
+# Alfa Hamster [Игра завершилась]
 
 **Alfa Hamster** — автоматический скрипт для кликов в игре от Альфа Банка, написанный на JavaScript.
 
